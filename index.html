@@ -8,9 +8,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hill Climb Timer">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
   <title>Hill Climb Timer</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -149,6 +146,16 @@
     .import-feedback.error{display:block;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;}
     .empty-state{text-align:center;padding:34px;color:#9ca3af;}
     .empty-state-icon{font-size:3rem;margin-bottom:10px;}
+    .history-event-card{background:#f8fafc;border-radius:14px;border-left:5px solid #cbd5e1;padding:16px;margin-bottom:12px;cursor:pointer;}
+    .history-event-card.vw{border-left-color:var(--blue);}
+    .history-event-card.mercedes{border-left-color:var(--silver);}
+    .history-event-header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+    .history-event-title{font-weight:800;color:#111827;font-size:1rem;}
+    .history-event-sub{color:#667085;font-size:.9rem;margin-top:4px;}
+    .history-expand-icon{font-size:1.2rem;font-weight:800;color:#667085;}
+    .history-event-body{display:none;margin-top:14px;}
+    .history-event-card.expanded .history-event-body{display:block;}
+
     @media (min-width: 700px){
       .stats-grid,.repair-stats-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
       .run-selector{grid-template-columns:repeat(3,1fr);}
@@ -173,7 +180,6 @@
     <div class="hero">
       <h1>Hill Climb Timer</h1>
       <div class="subtitle">Timing • Repairs • Setup Tracking</div>
-      <button id="installAppBtn" style="margin-top:14px;border:none;border-radius:12px;padding:10px 14px;background:linear-gradient(135deg,#1d4ed8,#143a9c);color:white;font-weight:800;display:none;cursor:pointer;">Install App</button>
     </div>
 
     <div class="tabs">
@@ -300,29 +306,39 @@
       </div>
     </div>
 
+    
     <div id="historyTab" class="tab-panel">
       <div class="card">
         <div class="section-box">
           <div class="section-head"><h3>📊 Event History</h3></div>
-          <div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
-            <div style="flex:1;">
-              <label for="historyEventSelect">Select Event</label>
-              <select id="historyEventSelect" onchange="renderHistoryView()">
-                <option value="">-- Select Event --</option>
-              </select>
-            </div>
-            <button id="deleteEventBtn" class="icon-btn" onclick="deleteSelectedEvent()" disabled>🗑️</button>
+          <p style="color:#4b5563;margin-bottom:14px;">Tap an event card to expand or collapse its runs.</p>
+          <div class="stats-grid" style="margin-bottom:0;">
+            <div class="stat-card blue"><div class="stat-label">VW Events</div><div class="stat-value" id="vwEventCount">0</div></div>
+            <div class="stat-card silver"><div class="stat-label">Mercedes Events</div><div class="stat-value" id="mercedesEventCount">0</div></div>
           </div>
         </div>
       </div>
 
-      <div class="card" id="historyRunsCard" style="display:none;">
-        <h2 class="section-title" style="margin-bottom:16px;">Selected Event Runs</h2>
-        <div id="historyRunsContainer"></div>
+      <div class="card">
+        <h2 class="section-title" style="margin-bottom:16px;">VW Polo Events</h2>
+        <div id="historyVWContainer">
+          <div class="empty-state"><div class="empty-state-icon">🏁</div><p>No VW events yet.</p></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title" style="margin-bottom:16px;">Mercedes A45s Events</h2>
+        <div id="historyMercedesContainer">
+          <div class="empty-state"><div class="empty-state-icon">🏁</div><p>No Mercedes events yet.</p></div>
+        </div>
       </div>
 
       <div class="card" id="historyGraphCard" style="display:none;">
-        <h2 class="section-title" style="margin-bottom:16px;">📈 Performance Analysis</h2>
+        <div class="section-head">
+          <h2 class="section-title" style="margin-bottom:0;">📈 Performance Analysis</h2>
+          <button id="deleteEventBtn" class="icon-btn" onclick="deleteSelectedEvent()" disabled>🗑️</button>
+        </div>
+        <div id="historyGraphTitle" style="color:#4b5563;margin-bottom:16px;"></div>
         <div class="graph-stats">
           <div class="graph-stat"><div class="graph-stat-label">Best Sector 1</div><div class="graph-stat-value" id="bestSector1">--.--</div></div>
           <div class="graph-stat"><div class="graph-stat-label">Best Sector 2</div><div class="graph-stat-value" id="bestSector2">--.--</div></div>
@@ -368,6 +384,7 @@
     </div>
 
     <div id="repairsTab" class="tab-panel">
+
       <div class="repair-stats-grid">
         <div class="stat-card red"><div class="stat-label">Total Spend</div><div class="stat-value" id="repairTotalSpend">$0.00</div></div>
         <div class="stat-card blue"><div class="stat-label">VW Spend</div><div class="stat-value" id="repairVWSpend">$0.00</div></div>
@@ -483,6 +500,7 @@
     let isSetupLocked = false;
     let editingOriginalDate = null;
     let chartInstance = null;
+    let selectedHistoryEvent = null;
 
     const statusDescriptions = {
       'time':'Enter sector and total times below',
@@ -794,59 +812,148 @@
       document.getElementById('repairMonthSpend').textContent = formatCurrency(month);
     }
 
+
     function deleteSelectedEvent(){
-      const selector = document.getElementById('historyEventSelect');
-      if (!selector || !selector.value) return;
+      if (!selectedHistoryEvent || !events[selectedHistoryEvent]) return;
       if (!confirm('Delete this entire event? This cannot be undone.')) return;
-      const date = selector.value;
-      delete events[date];
+      delete events[selectedHistoryEvent];
       saveData();
-      selector.value = '';
-      updateGraphSelector();
-      renderHistoryView();
+      if (currentEvent && currentEvent.date === selectedHistoryEvent) {
+        currentEvent = null;
+        isSetupLocked = false;
+        editingOriginalDate = null;
+        unlockSetupUI();
+        resetRunEntryUI();
+      }
+      selectedHistoryEvent = null;
       updateStats();
+      renderHistoryView();
     }
 
     function updateGraphSelector(){
-      const selector = document.getElementById('historyEventSelect');
-      const currentValue = selector ? selector.value : '';
-      if (!selector) return;
-
-      selector.innerHTML = '<option value="">-- Select Event --</option>';
-      Object.keys(events).sort().reverse().forEach(date=>{
-        const event = events[date];
-        const hasTimeRuns = Object.values(event.runs || {}).some(r=>r.status === 'time');
-        if (hasTimeRuns || Object.keys(event.runs || {}).length) {
-          const option = document.createElement('option');
-          option.value = date;
-          option.textContent = `${new Date(date).toLocaleDateString('en-AU')} - ${event.car}`;
-          selector.appendChild(option);
-        }
-      });
-
-      if (currentValue && events[currentValue]) selector.value = currentValue;
-      else if (currentEvent && events[currentEvent.date]) selector.value = currentEvent.date;
-
       renderHistoryView();
     }
 
-    function renderHistoryView(){
-      const selector = document.getElementById('historyEventSelect');
-      const runsCard = document.getElementById('historyRunsCard');
-      const graphCard = document.getElementById('historyGraphCard');
-      const container = document.getElementById('historyRunsContainer');
-      const deleteBtn = document.getElementById('deleteEventBtn');
-      if (!selector || !runsCard || !graphCard || !container) return;
+    function toggleHistoryEvent(date){
+      selectedHistoryEvent = selectedHistoryEvent === date ? null : date;
+      renderHistoryView();
+    }
 
-      const selectedDate = selector.value;
-      if(deleteBtn){
-        deleteBtn.disabled = !selectedDate;
+    function renderHistoryEventCards(car, containerId){
+      const container = document.getElementById(containerId);
+      const dates = Object.keys(events).filter(date => events[date].car === car).sort().reverse();
+
+      if (!dates.length) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🏁</div><p>No ${car === 'VW Polo' ? 'VW' : 'Mercedes'} events yet.</p></div>`;
+        return;
       }
 
-      if (!selectedDate || !events[selectedDate]) {
-        runsCard.style.display = 'none';
+      let html = '';
+      dates.forEach(date => {
+        const event = events[date];
+        const runNumbers = Object.keys(event.runs || {}).sort((a,b)=>parseInt(a,10)-parseInt(b,10));
+        const timeRuns = runNumbers.filter(runNum => event.runs[runNum].status === 'time');
+        let bestRunNum = null;
+        if (timeRuns.length) {
+          bestRunNum = timeRuns.reduce((best, runNum) =>
+            parseFloat(event.runs[runNum].totalTime) < parseFloat(event.runs[best].totalTime) ? runNum : best
+          );
+        }
+        const bestTime = bestRunNum ? formatSeconds(event.runs[bestRunNum].totalTime) + 's' : 'No timed runs';
+        const expanded = selectedHistoryEvent === date;
+        const carClass = car === 'VW Polo' ? 'vw' : 'mercedes';
+
+        html += `
+          <div class="history-event-card ${carClass} ${expanded ? 'expanded' : ''}" onclick="toggleHistoryEvent('${date}')">
+            <div class="history-event-header">
+              <div>
+                <div class="history-event-title">${new Date(date).toLocaleDateString('en-AU', { weekday:'short', year:'numeric', month:'short', day:'numeric' })}</div>
+                <div class="history-event-sub">${event.car} • ${event.laps} Lap${Number(event.laps) > 1 ? 's' : ''} • ${runNumbers.length}/6 Runs • Best: ${bestTime}</div>
+              </div>
+              <div class="tag-row">
+                <span class="car-tag ${carClass}">${event.car}</span>
+                ${bestRunNum ? `<span class="best-badge">${bestTime}</span>` : ''}
+                <span class="history-expand-icon">${expanded ? '−' : '+'}</span>
+              </div>
+            </div>
+            <div class="history-event-body" onclick="event.stopPropagation()">
+              <div class="runs-grid" style="margin-top:4px;margin-bottom:0;">
+        `;
+
+        runNumbers.forEach(runNum => {
+          const run = event.runs[runNum];
+          const isBest = String(runNum) === String(bestRunNum);
+          let cardClass = `${carClass}-run`;
+          let statusTag = '';
+          let content = '';
+
+          if (run.status === 'time') {
+            if (isBest) cardClass += ' best-run';
+            statusTag = '<span class="status-tag completed">COMPLETED</span>';
+            content = `
+              <div class="run-times">
+                <div class="time-box"><div class="time-label">Sector 1</div><div class="time-value">${formatSeconds(run.sector1)}s</div></div>
+                <div class="time-box"><div class="time-label">Sector 2</div><div class="time-value">${formatSeconds(run.sector2)}s</div></div>
+                <div class="time-box" style="background:#e0f2fe;"><div class="time-label">Total</div><div class="time-value" style="color:#075985;font-size:1.18rem;">${formatSeconds(run.totalTime)}s</div></div>
+              </div>
+            `;
+          } else if (run.status === 'DNS') {
+            cardClass += ' dns-run';
+            statusTag = '<span class="status-tag dns">DNS</span>';
+            content = '<div style="text-align:center;padding:18px;color:#b45309;font-weight:800;">Did Not Start</div>';
+          } else if (run.status === 'DSQ') {
+            cardClass += ' dsq-run';
+            statusTag = '<span class="status-tag dsq">DSQ</span>';
+            content = '<div style="text-align:center;padding:18px;color:#b91c1c;font-weight:800;">Disqualified</div>';
+          } else {
+            cardClass += ' no-run-card';
+            statusTag = '<span class="status-tag no-run">NO RUN</span>';
+            content = '<div style="text-align:center;padding:18px;color:#6b7280;font-weight:800;">No Run</div>';
+          }
+
+          html += `
+            <div class="run-card ${cardClass}">
+              <div class="run-header">
+                <span class="run-number">Run ${runNum}</span>
+                <div class="tag-row">
+                  <span class="car-tag ${carClass}">${event.car}</span>
+                  ${statusTag}
+                  ${isBest && run.status === 'time' ? '<span class="best-badge">BEST</span>' : ''}
+                </div>
+              </div>
+              ${content}
+            </div>
+          `;
+        });
+
+        html += `
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderHistoryView(){
+      const vwCount = Object.keys(events).filter(date => events[date].car === 'VW Polo').length;
+      const mercedesCount = Object.keys(events).filter(date => events[date].car === 'Mercedes A45s').length;
+      document.getElementById('vwEventCount').textContent = String(vwCount);
+      document.getElementById('mercedesEventCount').textContent = String(mercedesCount);
+
+      renderHistoryEventCards('VW Polo', 'historyVWContainer');
+      renderHistoryEventCards('Mercedes A45s', 'historyMercedesContainer');
+
+      const graphCard = document.getElementById('historyGraphCard');
+      const deleteBtn = document.getElementById('deleteEventBtn');
+      const graphTitle = document.getElementById('historyGraphTitle');
+
+      if (deleteBtn) deleteBtn.disabled = !selectedHistoryEvent;
+
+      if (!selectedHistoryEvent || !events[selectedHistoryEvent]) {
         graphCard.style.display = 'none';
-        container.innerHTML = '';
+        graphTitle.textContent = '';
         if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
         document.getElementById('bestSector1').textContent = '--.--';
         document.getElementById('bestSector2').textContent = '--.--';
@@ -854,90 +961,24 @@
         return;
       }
 
-      const event = events[selectedDate];
-      const runNumbers = Object.keys(event.runs || {}).sort((a,b)=>parseInt(a,10)-parseInt(b,10));
-      const timeRuns = runNumbers.filter(runNum => event.runs[runNum].status === 'time');
-      runsCard.style.display = 'block';
+      const event = events[selectedHistoryEvent];
+      const timeRuns = Object.keys(event.runs || {}).filter(runNum => event.runs[runNum].status === 'time');
 
-      let bestRunNum = null;
-      if (timeRuns.length) {
-        bestRunNum = timeRuns.reduce((best, runNum) => parseFloat(event.runs[runNum].totalTime) < parseFloat(event.runs[best].totalTime) ? runNum : best);
-      }
-
-      let html = `
-        <div class="day-header">
-          <div>
-            <h3>${new Date(selectedDate).toLocaleDateString('en-AU', { weekday:'short', year:'numeric', month:'short', day:'numeric' })}</h3>
-            <small style="opacity:.9;">${event.car} • ${event.laps} Lap${Number(event.laps) > 1 ? 's' : ''}</small>
-          </div>
-          <span>${runNumbers.length}/6 Runs</span>
-        </div>
-        <div class="runs-grid">
-      `;
-
-      runNumbers.forEach(runNum=>{
-        const run = event.runs[runNum];
-        const isBest = String(runNum) === String(bestRunNum);
-        const carClass = event.car === 'VW Polo' ? 'vw' : 'mercedes';
-        let cardClass = `${carClass}-run`;
-        let statusTag = '';
-        let content = '';
-
-        if (run.status === 'time') {
-          if (isBest) cardClass += ' best-run';
-          statusTag = '<span class="status-tag completed">COMPLETED</span>';
-          content = `
-            <div class="run-times">
-              <div class="time-box"><div class="time-label">Sector 1</div><div class="time-value">${formatSeconds(run.sector1)}s</div></div>
-              <div class="time-box"><div class="time-label">Sector 2</div><div class="time-value">${formatSeconds(run.sector2)}s</div></div>
-              <div class="time-box" style="background:#e0f2fe;"><div class="time-label">Total</div><div class="time-value" style="color:#075985;font-size:1.18rem;">${formatSeconds(run.totalTime)}s</div></div>
-            </div>
-          `;
-        } else if (run.status === 'DNS') {
-          cardClass += ' dns-run';
-          statusTag = '<span class="status-tag dns">DNS</span>';
-          content = '<div style="text-align:center;padding:18px;color:#b45309;font-weight:800;">Did Not Start</div>';
-        } else if (run.status === 'DSQ') {
-          cardClass += ' dsq-run';
-          statusTag = '<span class="status-tag dsq">DSQ</span>';
-          content = '<div style="text-align:center;padding:18px;color:#b91c1c;font-weight:800;">Disqualified</div>';
-        } else {
-          cardClass += ' no-run-card';
-          statusTag = '<span class="status-tag no-run">NO RUN</span>';
-          content = '<div style="text-align:center;padding:18px;color:#6b7280;font-weight:800;">No Run</div>';
-        }
-
-        html += `
-          <div class="run-card ${cardClass}">
-            <div class="run-header">
-              <span class="run-number">Run ${runNum}</span>
-              <div class="tag-row">
-                <span class="car-tag ${carClass}">${event.car}</span>
-                ${statusTag}
-                ${isBest && run.status === 'time' ? '<span class="best-badge">BEST</span>' : ''}
-              </div>
-            </div>
-            ${content}
-          </div>
-        `;
-      });
-
-      html += '</div>';
-      container.innerHTML = html;
-
-      if (timeRuns.length) {
-        graphCard.style.display = 'block';
-        updateGraph();
-      } else {
+      if (!timeRuns.length) {
         graphCard.style.display = 'none';
+        graphTitle.textContent = '';
         if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        return;
       }
+
+      graphCard.style.display = 'block';
+      graphTitle.textContent = `${new Date(selectedHistoryEvent).toLocaleDateString('en-AU', { weekday:'short', year:'numeric', month:'short', day:'numeric' })} • ${event.car}`;
+      updateGraph();
     }
 
     function updateGraph(){
-      const selectedDate = document.getElementById('historyEventSelect').value;
-      if (!selectedDate || !events[selectedDate]) return;
-      const event = events[selectedDate];
+      if (!selectedHistoryEvent || !events[selectedHistoryEvent]) return;
+      const event = events[selectedHistoryEvent];
       const timeRuns = [];
       for (let i = 1; i <= 6; i++) {
         if (event.runs[i] && event.runs[i].status === 'time') {
@@ -979,7 +1020,7 @@
         options:{
           responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
           plugins:{
-            title:{display:true, text:`${new Date(selectedDate).toLocaleDateString('en-AU')} - ${event.car} Performance`, font:{size:16,weight:'bold'}, padding:20},
+            title:{display:true, text:`${new Date(selectedHistoryEvent).toLocaleDateString('en-AU')} - ${event.car} Performance`, font:{size:16,weight:'bold'}, padding:20},
             legend:{position:'top', labels:{usePointStyle:true, padding:14}},
             tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}s`}}
           },
@@ -1183,40 +1224,7 @@
       }
     }
 
-
-    let deferredPrompt = null;
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      const btn = document.getElementById('installAppBtn');
-      if (btn) btn.style.display = 'inline-block';
-    });
-
-    const installBtn = document.getElementById('installAppBtn');
-    if (installBtn) {
-      installBtn.addEventListener('click', async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        await deferredPrompt.userChoice;
-        deferredPrompt = null;
-        installBtn.style.display = 'none';
-      });
-    }
-
-    window.addEventListener('appinstalled', () => {
-      const btn = document.getElementById('installAppBtn');
-      if (btn) btn.style.display = 'none';
-    });
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js');
-      });
-    }
-
     loadTodayEventIfExists();
-
     updateStats();
     updateRepairStats();
     updateRepairYearOptions();
