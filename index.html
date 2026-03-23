@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#101418">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hill Climb Timer">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>Hill Climb Timer</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root{
+      --bg:#0b0f14; --bg2:#161d24; --panel:#f5f7fb; --panel2:#ebeff5; --text:#111827; --muted:#667085;
+      --red:#c1121f; --red2:#8b1019; --blue:#1d4ed8; --blue2:#143a9c; --silver:#8a94a6; --silver2:#c6ccd8;
+      --green:#16a34a; --orange:#f59e0b; --danger:#dc2626; --grey:#6b7280; --shadow:0 14px 40px rgba(0,0,0,.28);
+    }
+    body{
+      font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;
+      background:radial-gradient(circle at top, rgba(193,18,31,.12), transparent 24%), linear-gradient(180deg, var(--bg2), var(--bg));
+      color:#fff; min-height:100vh; padding:max(14px, env(safe-area-inset-top)) 14px max(24px, env(safe-area-inset-bottom)) 14px;
+    }
+    .container{max-width:900px;margin:0 auto;}
+    .hero{
+      background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.08); border-radius:22px; box-shadow:var(--shadow);
+      padding:20px 16px; margin-bottom:16px; backdrop-filter:blur(6px); text-align:center;
+    }
+    h1{font-size:clamp(1.9rem, 5vw, 2.5rem);font-weight:800;letter-spacing:.4px;margin-bottom:6px;}
+    .subtitle{color:#c7d0dd;text-transform:uppercase;letter-spacing:1.8px;font-size:.82rem;}
+    .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+    .tab-btn{
+      border:none;border-radius:16px;padding:14px 16px;min-height:50px;background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      color:#fff;font-weight:800;cursor:pointer;box-shadow:var(--shadow);
+    }
+    .tab-btn.active{background:linear-gradient(135deg,var(--red),var(--red2));}
+    .tab-panel{display:none;}
+    .tab-panel.active{display:block;}
+    .card{background:var(--panel);color:var(--text);border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+    .stats-grid,.repair-stats-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px;}
+    .stat-card{
+      color:#fff;border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);background:linear-gradient(135deg,#1f2937,#111827);
+      display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:72px;
+    }
+    .stat-card.red{background:linear-gradient(135deg,var(--red),var(--red2));}
+    .stat-card.blue{background:linear-gradient(135deg,var(--blue),var(--blue2));}
+    .stat-card.silver{background:linear-gradient(135deg,var(--silver2),var(--silver)); color:#111827;}
+    .stat-label{font-size:.84rem;text-transform:uppercase;letter-spacing:1px;opacity:.95;flex:1;}
+    .stat-value{font-family:'Courier New',monospace;font-size:1.5rem;font-weight:800;white-space:nowrap;text-align:right;min-width:110px;}
+    .section-box{background:linear-gradient(135deg,var(--panel),var(--panel2));border:1px solid #d6dde8;border-radius:16px;padding:18px;margin-bottom:16px;}
+    .section-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+    .section-head h3,.section-title{font-size:1.15rem;color:#111827;}
+    .setup-locked{display:flex;gap:24px;flex-wrap:wrap;}
+    .setup-item{display:flex;flex-direction:column;}
+    .setup-label,.time-label,.repair-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+    .setup-value,.time-value,.repair-value{font-weight:800;color:#111827;}
+    .setup-form,.repair-form,.filter-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
+    .form-group{display:flex;flex-direction:column;}
+    .form-group.full{grid-column:1/-1;}
+    label{font-size:.84rem;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+    input,select,textarea,button{font:inherit;}
+    input,select,textarea{min-height:48px;padding:12px 14px;border-radius:12px;border:1px solid #d3dae6;background:#fff;}
+    textarea{min-height:96px;resize:vertical;}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:#94a3b8;box-shadow:0 0 0 4px rgba(148,163,184,.18);}
+    .edit-btn,.save-setup-btn,.add-btn,.data-btn,.run-btn,.delete-btn,.icon-btn{-webkit-tap-highlight-color:transparent;}
+    .edit-btn,.save-setup-btn,.add-btn,.data-btn,.delete-btn{
+      border:none;border-radius:12px;padding:12px 16px;color:#fff;font-weight:800;cursor:pointer;
+    }
+    .icon-btn{
+      height:48px;width:48px;border:none;border-radius:12px;background:#b91c1c;color:#fff;font-size:20px;font-weight:bold;cursor:pointer;
+    }
+    .icon-btn:disabled{opacity:.5;cursor:not-allowed;}
+    .edit-btn,.save-setup-btn{background:linear-gradient(135deg,#111827,#374151);}
+    .add-btn{background:linear-gradient(135deg,var(--red),var(--red2));width:100%;text-transform:uppercase;letter-spacing:1px;}
+    .add-btn.repair{background:linear-gradient(135deg,#111827,#374151);}
+    .run-selector{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;}
+    .run-btn{border:2px solid #cbd5e1;background:#fff;color:#111827;border-radius:18px;min-height:58px;font-weight:800;cursor:pointer;padding:10px;}
+    .run-btn.active{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff;border-color:transparent;}
+    .run-btn.completed{background:var(--green);border-color:var(--green);color:#fff;}
+    .run-btn.dns{background:var(--orange);border-color:var(--orange);color:#fff;}
+    .run-btn.dsq{background:var(--danger);border-color:var(--danger);color:#fff;}
+    .run-btn.no-run{background:var(--grey);border-color:var(--grey);color:#fff;}
+    .run-status-badge{display:block;font-size:.72rem;margin-top:2px;}
+    .progress-bar{height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;}
+    .progress-fill{height:100%;background:linear-gradient(90deg,var(--red),var(--red2));transition:width .3s ease;}
+    .current-run-box{background:linear-gradient(135deg,#f3f4f6,#e5e7eb);border-left:5px solid var(--red);border-radius:14px;padding:18px;margin-top:18px;}
+    .current-run-title{font-size:1.1rem;font-weight:800;color:#111827;margin-bottom:16px;display:flex;gap:10px;align-items:center;}
+    .run-status-select{margin-bottom:16px;}
+    .status-description{margin-top:8px;color:var(--muted);font-style:italic;font-size:.9rem;}
+    .time-inputs,.run-times,.repair-meta{display:grid;grid-template-columns:1fr;gap:12px;}
+    .repair-meta{grid-template-columns:1fr 1fr;}
+    .time-group{position:relative;}
+    .time-group input{text-align:center;font-family:'Courier New',monospace;font-size:1.35rem;font-weight:800;padding:16px 34px 16px 12px;}
+    .time-suffix{position:absolute;right:14px;top:calc(50% + 16px);transform:translateY(-50%);color:#98a2b3;}
+    .non-time-status{background:#fff;border-radius:12px;padding:24px;text-align:center;}
+    .day-header{background:linear-gradient(135deg,#111827,#1f2937);color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;}
+    .runs-grid,.repairs-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:18px;}
+    .run-card,.repair-card{background:#f8fafc;border-radius:14px;padding:18px;border-left:5px solid #cbd5e1;}
+    .run-card.best-run{border-left-color:#facc15;background:linear-gradient(90deg,#fff8d6,#fffcef);}
+    .run-card.vw-run{border-left-color:var(--blue);}
+    .run-card.mercedes-run{border-left-color:var(--silver);}
+    .run-card.dns-run{border-left-color:var(--orange);background:#fff7ed;}
+    .run-card.dsq-run{border-left-color:var(--danger);background:#fef2f2;}
+    .run-card.no-run-card{border-left-color:var(--grey);background:#f3f4f6;}
+    .repair-card.vw-repair{border-left-color:var(--blue);}
+    .repair-card.mercedes-repair{border-left-color:var(--silver);}
+    .repair-card.general-repair{border-left-color:#111827;}
+    .run-header,.repair-header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+    .run-number,.repair-cost{font-size:1.02rem;font-weight:800;color:#111827;}
+    .repair-cost{font-family:'Courier New',monospace;}
+    .tag-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .car-tag,.status-tag,.best-badge,.type-tag,.category-tag{padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:800;white-space:nowrap;}
+    .car-tag.vw{background:#dbeafe;color:#1d4ed8;}
+    .car-tag.mercedes{background:#e5e7eb;color:#334155;}
+    .car-tag.general{background:#e5e7eb;color:#111827;}
+    .status-tag{color:#fff;}
+    .status-tag.completed{background:var(--green);}
+    .status-tag.dns{background:var(--orange);}
+    .status-tag.dsq{background:var(--danger);}
+    .status-tag.no-run{background:var(--grey);}
+    .best-badge{background:#facc15;color:#111827;}
+    .type-tag.maintenance{background:#dcfce7;color:#166534;}
+    .type-tag.damage{background:#fee2e2;color:#991b1b;}
+    .type-tag.upgrade{background:#ede9fe;color:#6d28d9;}
+    .category-tag{background:#e0f2fe;color:#075985;}
+    .time-box,.repair-mini-box{background:#fff;border-radius:10px;padding:10px;text-align:center;}
+    .repair-desc{background:#fff;border-radius:10px;padding:12px;color:#374151;line-height:1.45;white-space:pre-wrap;margin-top:10px;}
+    .delete-btn{background:linear-gradient(135deg,var(--danger),#b91c1c);width:100%;margin-top:14px;}
+    .graph-stats{display:grid;grid-template-columns:1fr;gap:12px;background:#f8fafc;border-radius:12px;padding:14px;margin-bottom:16px;}
+    .graph-stat{text-align:center;}
+    .graph-stat-label{font-size:.75rem;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+    .graph-stat-value{font-family:'Courier New',monospace;font-weight:800;color:#111827;}
+    .graph-container{position:relative;height:320px;margin-top:18px;}
+    .data-management{background:linear-gradient(135deg,var(--panel),var(--panel2));border:1px solid #d6dde8;border-radius:16px;padding:18px;}
+    .data-actions{display:flex;gap:12px;flex-wrap:wrap;}
+    .data-btn{display:flex;align-items:center;gap:8px;min-height:48px;}
+    .export-btn{background:linear-gradient(135deg,#111827,#374151);}
+    .import-btn{background:linear-gradient(135deg,var(--blue),var(--blue2));}
+    .clear-btn{background:linear-gradient(135deg,var(--danger),#b91c1c);}
+    .file-input-wrapper{position:relative;overflow:hidden;display:inline-block;}
+    .file-input-wrapper input[type=file]{position:absolute;left:-9999px;}
+    .import-feedback{margin-top:14px;padding:12px;border-radius:10px;font-weight:700;display:none;}
+    .import-feedback.success{display:block;background:#ecfdf5;border:1px solid #86efac;color:#166534;}
+    .import-feedback.error{display:block;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;}
+    .empty-state{text-align:center;padding:34px;color:#9ca3af;}
+    .empty-state-icon{font-size:3rem;margin-bottom:10px;}
+    @media (min-width: 700px){
+      .stats-grid,.repair-stats-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
+      .run-selector{grid-template-columns:repeat(3,1fr);}
+      .runs-grid,.repairs-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));}
+      .time-inputs{grid-template-columns:repeat(3,1fr);}
+      .graph-stats{grid-template-columns:repeat(3,1fr);}
+    }
+    @media (max-width: 420px){
+      .stat-card{padding:14px 15px;gap:10px;}
+      .stat-label{font-size:.76rem;letter-spacing:.6px;}
+      .stat-value{font-size:1.35rem;min-width:96px;}
+      .subtitle{font-size:.74rem;letter-spacing:1.3px;}
+      h1{font-size:2rem;}
+      .repair-meta{grid-template-columns:1fr;}
+      .tabs{grid-template-columns:1fr 1fr 1fr;}
+      .tab-btn{padding:12px 8px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>Hill Climb Timer</h1>
+      <div class="subtitle">Timing • Repairs • Setup Tracking</div>
+      <button id="installAppBtn" style="margin-top:14px;border:none;border-radius:12px;padding:10px 14px;background:linear-gradient(135deg,#1d4ed8,#143a9c);color:white;font-weight:800;display:none;cursor:pointer;">Install App</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('timingTab', this)">⏱️ Timing</button>
+      <button class="tab-btn" onclick="switchTab('historyTab', this)">📊 History</button>
+      <button class="tab-btn" onclick="switchTab('repairsTab', this)">🔧 Repairs</button>
+    </div>
+
+    <div id="timingTab" class="tab-panel active">
+      <div class="stats-grid">
+        <div class="stat-card red"><div class="stat-label">Overall Best</div><div class="stat-value" id="bestOverall">--.--</div></div>
+        <div class="stat-card blue"><div class="stat-label">VW Polo Best</div><div class="stat-value" id="bestVW">--.--</div></div>
+        <div class="stat-card silver"><div class="stat-label">Mercedes A45s Best</div><div class="stat-value" id="bestMercedes">--.--</div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-box">
+          <div class="section-head">
+            <h3>📅 Event Setup</h3>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="edit-btn" id="newEventBtn" onclick="startNewEvent()">New Event</button>
+              <button class="edit-btn" id="closeEventBtn" onclick="closeCurrentEvent()" style="display:none;">Close Event</button>
+              <button class="edit-btn" id="editSetupBtn" onclick="toggleEditSetup()" style="display:none;">Edit</button>
+            </div>
+          </div>
+
+          <div id="setupDisplay" class="setup-locked" style="display:none;">
+            <div class="setup-item"><span class="setup-label">Date</span><span class="setup-value" id="displayDate">-</span></div>
+            <div class="setup-item"><span class="setup-label">Vehicle</span><span class="setup-value" id="displayCar">-</span></div>
+            <div class="setup-item"><span class="setup-label">Laps</span><span class="setup-value" id="displayLaps">-</span></div>
+          </div>
+
+          <form id="setupForm" class="setup-form">
+            <div class="form-group">
+              <label for="eventDate">Event Date</label>
+              <input type="date" id="eventDate" required>
+            </div>
+            <div class="form-group">
+              <label for="eventCar">Vehicle</label>
+              <select id="eventCar" required>
+                <option value="">Select Car</option>
+                <option value="VW Polo">VW Polo</option>
+                <option value="Mercedes A45s">Mercedes A45s</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="eventLaps">Number of Laps</label>
+              <select id="eventLaps" required>
+                <option value="1" selected>1 Lap</option>
+                <option value="2">2 Laps</option>
+              </select>
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;">
+              <button type="submit" class="save-setup-btn">Lock In Event</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="runEntrySection" style="display:none;">
+          <h3 class="section-title" style="margin-bottom:16px;">Record Run Times</h3>
+          <div class="run-selector">
+            <button class="run-btn" data-run="1" onclick="selectRun(1)">Run 1</button>
+            <button class="run-btn" data-run="2" onclick="selectRun(2)">Run 2</button>
+            <button class="run-btn" data-run="3" onclick="selectRun(3)">Run 3</button>
+            <button class="run-btn" data-run="4" onclick="selectRun(4)">Run 4</button>
+            <button class="run-btn" data-run="5" onclick="selectRun(5)">Run 5</button>
+            <button class="run-btn" data-run="6" onclick="selectRun(6)">Run 6</button>
+          </div>
+
+          <div class="progress-bar"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+
+          <div id="timeEntryForm" style="display:none;">
+            <div class="current-run-box">
+              <div class="current-run-title">🏁 Run <span id="currentRunLabel">1</span></div>
+
+              <div class="run-status-select">
+                <label for="runStatus">Run Status</label>
+                <select id="runStatus" onchange="handleStatusChange()">
+                  <option value="">-- Select Status --</option>
+                  <option value="time">Record Time</option>
+                  <option value="DNS">DNS - Did Not Start</option>
+                  <option value="DSQ">DSQ - Disqualified</option>
+                  <option value="No Run">No Run</option>
+                </select>
+                <div class="status-description" id="statusDescription"></div>
+              </div>
+
+              <div id="timeInputsContainer" style="display:none;">
+                <div class="time-inputs">
+                  <div class="time-group">
+                    <label style="text-align:center;display:block;margin-bottom:8px;">1st Sector</label>
+                    <input type="number" id="sector1" placeholder="00.00" step="0.01" min="0" inputmode="decimal">
+                    <span class="time-suffix">s</span>
+                  </div>
+                  <div class="time-group">
+                    <label style="text-align:center;display:block;margin-bottom:8px;">2nd Sector</label>
+                    <input type="number" id="sector2" placeholder="00.00" step="0.01" min="0" inputmode="decimal">
+                    <span class="time-suffix">s</span>
+                  </div>
+                  <div class="time-group">
+                    <label style="text-align:center;display:block;margin-bottom:8px;">Total Time</label>
+                    <input type="number" id="totalTime" placeholder="00.00" step="0.01" min="0" inputmode="decimal">
+                    <span class="time-suffix">s</span>
+                  </div>
+                </div>
+              </div>
+
+              <div id="nonTimeStatus" class="non-time-status" style="display:none;">
+                <h4 id="nonTimeTitle">Status Selected</h4>
+                <p id="nonTimeDesc">Description</p>
+              </div>
+
+              <button onclick="saveRun()" class="add-btn" style="margin-top:18px;">💾 Save Run</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-box" style="margin-bottom:0;">
+          <div class="section-head" style="margin-bottom:8px;"><h3>📊 Event Review</h3></div>
+          <p style="color:#4b5563;">Use the History tab to review completed events, see the graph, and browse repair history.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="historyTab" class="tab-panel">
+      <div class="card">
+        <div class="section-box">
+          <div class="section-head"><h3>📊 Event History</h3></div>
+          <div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
+            <div style="flex:1;">
+              <label for="historyEventSelect">Select Event</label>
+              <select id="historyEventSelect" onchange="renderHistoryView()">
+                <option value="">-- Select Event --</option>
+              </select>
+            </div>
+            <button id="deleteEventBtn" class="icon-btn" onclick="deleteSelectedEvent()" disabled>🗑️</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="historyRunsCard" style="display:none;">
+        <h2 class="section-title" style="margin-bottom:16px;">Selected Event Runs</h2>
+        <div id="historyRunsContainer"></div>
+      </div>
+
+      <div class="card" id="historyGraphCard" style="display:none;">
+        <h2 class="section-title" style="margin-bottom:16px;">📈 Performance Analysis</h2>
+        <div class="graph-stats">
+          <div class="graph-stat"><div class="graph-stat-label">Best Sector 1</div><div class="graph-stat-value" id="bestSector1">--.--</div></div>
+          <div class="graph-stat"><div class="graph-stat-label">Best Sector 2</div><div class="graph-stat-value" id="bestSector2">--.--</div></div>
+          <div class="graph-stat"><div class="graph-stat-label">Best Total</div><div class="graph-stat-value" id="bestTotal">--.--</div></div>
+        </div>
+        <div class="graph-container"><canvas id="performanceChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="section-box">
+          <div class="section-head"><h3>🔧 Repair History</h3></div>
+          <div class="filter-form">
+            <div class="form-group">
+              <label for="filterRepairCar">Vehicle</label>
+              <select id="filterRepairCar" onchange="renderRepairs()">
+                <option value="All">All Vehicles</option>
+                <option value="VW Polo">VW Polo</option>
+                <option value="Mercedes A45s">Mercedes A45s</option>
+                <option value="General">General</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="filterRepairType">Entry Type</label>
+              <select id="filterRepairType" onchange="renderRepairs()">
+                <option value="All">All Types</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Damage">Damage</option>
+                <option value="Upgrade">Upgrade</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="filterRepairYear">Year</label>
+              <select id="filterRepairYear" onchange="renderRepairs()">
+                <option value="All">All Years</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div id="repairsContainer">
+          <div class="empty-state"><div class="empty-state-icon">🔧</div><p>No repair entries yet.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="repairsTab" class="tab-panel">
+      <div class="repair-stats-grid">
+        <div class="stat-card red"><div class="stat-label">Total Spend</div><div class="stat-value" id="repairTotalSpend">$0.00</div></div>
+        <div class="stat-card blue"><div class="stat-label">VW Spend</div><div class="stat-value" id="repairVWSpend">$0.00</div></div>
+        <div class="stat-card silver"><div class="stat-label">Mercedes Spend</div><div class="stat-value" id="repairMercedesSpend">$0.00</div></div>
+        <div class="stat-card"><div class="stat-label">This Year</div><div class="stat-value" id="repairYearSpend">$0.00</div></div>
+        <div class="stat-card"><div class="stat-label">This Month</div><div class="stat-value" id="repairMonthSpend">$0.00</div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-box">
+          <div class="section-head"><h3>🔧 Add Repair / Maintenance</h3></div>
+
+          <form id="repairForm" class="repair-form">
+            <div class="form-group">
+              <label for="repairDate">Date</label>
+              <input type="date" id="repairDate" required>
+            </div>
+            <div class="form-group">
+              <label for="repairCar">Vehicle</label>
+              <select id="repairCar" required>
+                <option value="">Select Vehicle</option>
+                <option value="VW Polo">VW Polo</option>
+                <option value="Mercedes A45s">Mercedes A45s</option>
+                <option value="General">General</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="repairType">Entry Type</label>
+              <select id="repairType" required>
+                <option value="">Select Type</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Damage">Damage</option>
+                <option value="Upgrade">Upgrade</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="repairCategory">Category</label>
+              <select id="repairCategory" required>
+                <option value="">Select Category</option>
+                <option value="Brakes">Brakes</option>
+                <option value="Tyres">Tyres</option>
+                <option value="Suspension">Suspension</option>
+                <option value="Engine">Engine</option>
+                <option value="Cooling">Cooling</option>
+                <option value="Drivetrain">Drivetrain</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Bodywork">Bodywork</option>
+                <option value="Service">Service</option>
+                <option value="Registration">Registration</option>
+                <option value="Insurance">Insurance</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="repairOdometer">Odometer (km)</label>
+              <input type="number" id="repairOdometer" placeholder="000000" step="1" min="0" inputmode="numeric">
+            </div>
+            <div class="form-group">
+              <label for="repairCost">Cost</label>
+              <input type="number" id="repairCost" placeholder="0.00" step="0.01" min="0" inputmode="decimal" required>
+            </div>
+            <div class="form-group full">
+              <label for="repairDescription">Description</label>
+              <textarea id="repairDescription" placeholder="Example: front brake pads, oil service, wheel alignment, intercooler hose..."></textarea>
+            </div>
+            <div class="form-group full">
+              <button type="submit" class="add-btn repair">💾 Save Repair Entry</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="data-management">
+        <div class="section-head" style="margin-bottom:10px;"><h3>💾 Data Management</h3></div>
+        <p style="color:#4b5563;margin-bottom:16px;">Export your data to create a backup, or import previously saved data. Timing data and repair history are both included.</p>
+        <div class="data-actions">
+          <button class="data-btn export-btn" onclick="exportData()">📥 Export to JSON</button>
+          <div class="file-input-wrapper">
+            <input type="file" id="importFile" accept=".json" onchange="importData(this)">
+            <button class="data-btn import-btn" onclick="document.getElementById('importFile').click()">📤 Import from JSON</button>
+          </div>
+          <button class="data-btn clear-btn" onclick="clearAllData()">🗑️ Clear All Data</button>
+        </div>
+        <div id="importFeedback" class="import-feedback"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'hillClimbAppV14';
+    const LEGACY_KEYS = ['hillClimbAppV6a', 'hillClimbAppV6', 'hillClimbAppV5', 'hillClimbEventsV4', 'hillClimbEventsV3'];
+
+    function loadAppData() {
+      let raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (!raw) {
+        for (const key of LEGACY_KEYS) {
+          const legacy = JSON.parse(localStorage.getItem(key));
+          if (legacy) { raw = legacy; break; }
+        }
+      }
+      if (!raw) return { events: {}, repairs: [] };
+      if (raw.events || raw.repairs) return { events: raw.events || {}, repairs: Array.isArray(raw.repairs) ? raw.repairs : [] };
+      return { events: raw || {}, repairs: [] };
+    }
+
+    let appData = loadAppData();
+    let events = appData.events;
+    let repairs = appData.repairs;
+    let currentEvent = null;
+    let selectedRun = null;
+    let isSetupLocked = false;
+    let editingOriginalDate = null;
+    let chartInstance = null;
+
+    const statusDescriptions = {
+      'time':'Enter sector and total times below',
+      'DNS':'Did Not Start - Driver did not start this run',
+      'DSQ':'Disqualified - Run disqualified due to violation',
+      'No Run':'No Run - Run was not attempted'
+    };
+
+    document.getElementById('eventDate').valueAsDate = new Date();
+    document.getElementById('repairDate').valueAsDate = new Date();
+
+    function switchTab(tabId, btn){
+      document.querySelectorAll('.tab-panel').forEach(el=>el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el=>el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+      if (tabId === 'historyTab') updateGraphSelector();
+    }
+
+    document.getElementById('setupForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      const date = document.getElementById('eventDate').value;
+      const car = document.getElementById('eventCar').value;
+      const laps = document.getElementById('eventLaps').value;
+      if (!date || !car || !laps) return;
+
+      if (editingOriginalDate && editingOriginalDate !== date && events[editingOriginalDate]) {
+        const existingRuns = events[editingOriginalDate].runs || {};
+        delete events[editingOriginalDate];
+        events[date] = { date, car, laps, runs: existingRuns };
+      } else {
+        if (!events[date]) events[date] = { date, car, laps, runs: {} };
+        events[date].car = car;
+        events[date].laps = laps;
+      }
+
+      currentEvent = events[date];
+      isSetupLocked = true;
+      editingOriginalDate = null;
+      saveData();
+      lockSetupUI();
+      showRunEntry();
+      updateRunSelector();
+      updateStats();
+      updateGraphSelector();
+    });
+
+    document.getElementById('repairForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      const entry = {
+        id: Date.now(),
+        date: document.getElementById('repairDate').value,
+        car: document.getElementById('repairCar').value,
+        type: document.getElementById('repairType').value,
+        category: document.getElementById('repairCategory').value,
+        odometer: document.getElementById('repairOdometer').value ? parseInt(document.getElementById('repairOdometer').value, 10) : null,
+        cost: parseFloat(document.getElementById('repairCost').value || '0').toFixed(2),
+        description: document.getElementById('repairDescription').value.trim()
+      };
+      if (!entry.date || !entry.car || !entry.type || !entry.category || !entry.description) {
+        alert('Please fill in all required repair fields');
+        return;
+      }
+      repairs.unshift(entry);
+      saveData();
+      updateRepairStats();
+      updateRepairYearOptions();
+      renderRepairs();
+      document.getElementById('repairDate').valueAsDate = new Date();
+      document.getElementById('repairCar').value = '';
+      document.getElementById('repairType').value = '';
+      document.getElementById('repairCategory').value = '';
+      document.getElementById('repairOdometer').value = '';
+      document.getElementById('repairCost').value = '';
+      document.getElementById('repairDescription').value = '';
+      showFeedback('Repair entry saved.', 'success');
+    });
+
+    function toggleEditSetup(){
+      if (!isSetupLocked || !currentEvent) return;
+      if (confirm('Editing event setup will affect all runs for this date. Continue?')) {
+        isSetupLocked = false;
+        editingOriginalDate = currentEvent.date;
+        unlockSetupUI();
+        document.getElementById('runEntrySection').style.display = 'none';
+      }
+    }
+
+    function lockSetupUI(){
+      if (!currentEvent) return;
+      document.getElementById('setupForm').style.display = 'none';
+      document.getElementById('setupDisplay').style.display = 'flex';
+      document.getElementById('editSetupBtn').style.display = 'block';
+      document.getElementById('closeEventBtn').style.display = 'block';
+      document.getElementById('displayDate').textContent = new Date(currentEvent.date).toLocaleDateString('en-AU', {weekday:'short',year:'numeric',month:'short',day:'numeric'});
+      document.getElementById('displayCar').textContent = currentEvent.car;
+      document.getElementById('displayLaps').textContent = currentEvent.laps + ' Lap' + (Number(currentEvent.laps) > 1 ? 's' : '');
+    }
+
+    function unlockSetupUI(){
+      document.getElementById('setupForm').style.display = 'grid';
+      document.getElementById('setupDisplay').style.display = 'none';
+      document.getElementById('editSetupBtn').style.display = 'none';
+      document.getElementById('closeEventBtn').style.display = 'none';
+      if (currentEvent) {
+        document.getElementById('eventDate').value = currentEvent.date;
+        document.getElementById('eventCar').value = currentEvent.car;
+        document.getElementById('eventLaps').value = currentEvent.laps;
+      } else {
+        document.getElementById('eventDate').valueAsDate = new Date();
+        document.getElementById('eventCar').value = '';
+        document.getElementById('eventLaps').value = '1';
+      }
+    }
+
+    function resetRunEntryUI(){
+      selectedRun = null;
+      document.getElementById('runEntrySection').style.display = 'none';
+      document.getElementById('timeEntryForm').style.display = 'none';
+      document.querySelectorAll('.run-btn').forEach(btn=>btn.classList.remove('active'));
+      document.getElementById('progressBar').style.width = '0%';
+    }
+
+    function startNewEvent(){
+      currentEvent = null;
+      isSetupLocked = false;
+      editingOriginalDate = null;
+      unlockSetupUI();
+      resetRunEntryUI();
+      document.getElementById('eventDate').valueAsDate = new Date();
+      document.getElementById('eventCar').value = '';
+      document.getElementById('eventLaps').value = '1';
+    }
+
+    function closeCurrentEvent(){
+      currentEvent = null;
+      isSetupLocked = false;
+      editingOriginalDate = null;
+      unlockSetupUI();
+      resetRunEntryUI();
+    }
+
+    function showRunEntry(){ document.getElementById('runEntrySection').style.display = 'block'; }
+
+    function selectRun(runNum){
+      if (!currentEvent) return;
+      selectedRun = runNum;
+      document.querySelectorAll('.run-btn').forEach(btn=>{
+        btn.classList.remove('active');
+        if (parseInt(btn.dataset.run, 10) === runNum) btn.classList.add('active');
+      });
+      document.getElementById('timeEntryForm').style.display = 'block';
+      document.getElementById('currentRunLabel').textContent = runNum;
+      document.getElementById('runStatus').value = '';
+      document.getElementById('statusDescription').textContent = '';
+      document.getElementById('timeInputsContainer').style.display = 'none';
+      document.getElementById('nonTimeStatus').style.display = 'none';
+      document.getElementById('sector1').value = '';
+      document.getElementById('sector2').value = '';
+      document.getElementById('totalTime').value = '';
+
+      const existingRun = currentEvent.runs[runNum];
+      if (existingRun) {
+        document.getElementById('runStatus').value = existingRun.status;
+        if (existingRun.status === 'time') {
+          document.getElementById('sector1').value = existingRun.sector1;
+          document.getElementById('sector2').value = existingRun.sector2;
+          document.getElementById('totalTime').value = existingRun.totalTime;
+        }
+        handleStatusChange();
+      }
+    }
+
+    function handleStatusChange(){
+      const status = document.getElementById('runStatus').value;
+      const descEl = document.getElementById('statusDescription');
+      const timeInputs = document.getElementById('timeInputsContainer');
+      const nonTimeStatus = document.getElementById('nonTimeStatus');
+      document.getElementById('sector1').required = false;
+      document.getElementById('sector2').required = false;
+      document.getElementById('totalTime').required = false;
+
+      if (!status) {
+        descEl.textContent = '';
+        timeInputs.style.display = 'none';
+        nonTimeStatus.style.display = 'none';
+        return;
+      }
+      descEl.textContent = statusDescriptions[status] || '';
+      if (status === 'time') {
+        timeInputs.style.display = 'block';
+        nonTimeStatus.style.display = 'none';
+        document.getElementById('sector1').required = true;
+        document.getElementById('sector2').required = true;
+        document.getElementById('totalTime').required = true;
+      } else {
+        timeInputs.style.display = 'none';
+        nonTimeStatus.style.display = 'block';
+        document.getElementById('nonTimeTitle').textContent = status;
+        document.getElementById('nonTimeDesc').textContent = statusDescriptions[status];
+      }
+    }
+
+    function saveRun(){
+      if (!currentEvent || !selectedRun) { alert('Please select a run first'); return; }
+      const status = document.getElementById('runStatus').value;
+      if (!status) { alert('Please select a run status'); return; }
+
+      let runData = { status };
+      if (status === 'time') {
+        const sector1 = document.getElementById('sector1').value;
+        const sector2 = document.getElementById('sector2').value;
+        const totalTime = document.getElementById('totalTime').value;
+        if (!sector1 || !sector2 || !totalTime) { alert('Please enter all three times'); return; }
+        runData.sector1 = parseFloat(sector1).toFixed(2);
+        runData.sector2 = parseFloat(sector2).toFixed(2);
+        runData.totalTime = parseFloat(totalTime).toFixed(2);
+      }
+      currentEvent.runs[selectedRun] = runData;
+      events[currentEvent.date] = currentEvent;
+      saveData();
+      updateRunSelector();
+      updateStats();
+      updateGraphSelector();
+
+      const nextRun = selectedRun + 1;
+      if (nextRun <= 6) selectRun(nextRun);
+      else {
+        alert('All 6 runs completed for this event!');
+        document.getElementById('timeEntryForm').style.display = 'none';
+        selectedRun = null;
+        document.querySelectorAll('.run-btn').forEach(btn=>btn.classList.remove('active'));
+      }
+    }
+
+    function updateRunSelector(){
+      if (!currentEvent) { document.getElementById('progressBar').style.width = '0%'; return; }
+      const runs = currentEvent.runs || {};
+      const completedCount = Object.keys(runs).length;
+      document.getElementById('progressBar').style.width = ((completedCount / 6) * 100) + '%';
+
+      document.querySelectorAll('.run-btn').forEach(btn=>{
+        const runNum = parseInt(btn.dataset.run, 10);
+        btn.className = 'run-btn';
+        btn.innerHTML = 'Run ' + runNum;
+        const run = runs[runNum];
+        if (run) {
+          if (run.status === 'time') {
+            btn.classList.add('completed');
+            btn.innerHTML = `Run ${runNum} ✓<span class="run-status-badge">${run.totalTime}s</span>`;
+          } else if (run.status === 'DNS') {
+            btn.classList.add('dns');
+            btn.innerHTML = `Run ${runNum}<span class="run-status-badge">DNS</span>`;
+          } else if (run.status === 'DSQ') {
+            btn.classList.add('dsq');
+            btn.innerHTML = `Run ${runNum}<span class="run-status-badge">DSQ</span>`;
+          } else if (run.status === 'No Run') {
+            btn.classList.add('no-run');
+            btn.innerHTML = `Run ${runNum}<span class="run-status-badge">No Run</span>`;
+          }
+        }
+      });
+    }
+
+    function saveData(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({ events, repairs })); }
+    function formatSeconds(val){ return parseFloat(val).toFixed(2); }
+    function formatCurrency(val){ return '$' + Number(val || 0).toFixed(2); }
+
+    function getAllRuns(){
+      const runs = [];
+      Object.values(events).forEach(event=>{
+        Object.entries(event.runs || {}).forEach(([runNum, runData])=>{
+          if (runData.status === 'time') runs.push({ ...runData, date:event.date, car:event.car, laps:event.laps, runNumber:runNum });
+        });
+      });
+      return runs;
+    }
+
+    function updateStats(){
+      const allRuns = getAllRuns();
+      if (!allRuns.length) {
+        document.getElementById('bestOverall').textContent = '--.--';
+        document.getElementById('bestVW').textContent = '--.--';
+        document.getElementById('bestMercedes').textContent = '--.--';
+        return;
+      }
+      const bestOverall = allRuns.reduce((best, run)=>parseFloat(run.totalTime) < parseFloat(best.totalTime) ? run : best);
+      document.getElementById('bestOverall').textContent = formatSeconds(bestOverall.totalTime);
+      const vwRuns = allRuns.filter(r=>r.car === 'VW Polo');
+      const mercRuns = allRuns.filter(r=>r.car === 'Mercedes A45s');
+      document.getElementById('bestVW').textContent = vwRuns.length ? formatSeconds(vwRuns.reduce((best, run)=>parseFloat(run.totalTime) < parseFloat(best.totalTime) ? run : best).totalTime) : '--.--';
+      document.getElementById('bestMercedes').textContent = mercRuns.length ? formatSeconds(mercRuns.reduce((best, run)=>parseFloat(run.totalTime) < parseFloat(best.totalTime) ? run : best).totalTime) : '--.--';
+    }
+
+    function updateRepairStats(){
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      const total = repairs.reduce((s,r)=>s + Number(r.cost || 0), 0);
+      const vw = repairs.filter(r=>r.car === 'VW Polo').reduce((s,r)=>s + Number(r.cost || 0), 0);
+      const merc = repairs.filter(r=>r.car === 'Mercedes A45s').reduce((s,r)=>s + Number(r.cost || 0), 0);
+      const year = repairs.filter(r=> new Date(r.date).getFullYear() === currentYear).reduce((s,r)=>s + Number(r.cost || 0), 0);
+      const month = repairs.filter(r=> { const d = new Date(r.date); return d.getFullYear() === currentYear && d.getMonth() === currentMonth; }).reduce((s,r)=>s + Number(r.cost || 0), 0);
+
+      document.getElementById('repairTotalSpend').textContent = formatCurrency(total);
+      document.getElementById('repairVWSpend').textContent = formatCurrency(vw);
+      document.getElementById('repairMercedesSpend').textContent = formatCurrency(merc);
+      document.getElementById('repairYearSpend').textContent = formatCurrency(year);
+      document.getElementById('repairMonthSpend').textContent = formatCurrency(month);
+    }
+
+    function deleteSelectedEvent(){
+      const selector = document.getElementById('historyEventSelect');
+      if (!selector || !selector.value) return;
+      if (!confirm('Delete this entire event? This cannot be undone.')) return;
+      const date = selector.value;
+      delete events[date];
+      saveData();
+      selector.value = '';
+      updateGraphSelector();
+      renderHistoryView();
+      updateStats();
+    }
+
+    function updateGraphSelector(){
+      const selector = document.getElementById('historyEventSelect');
+      const currentValue = selector ? selector.value : '';
+      if (!selector) return;
+
+      selector.innerHTML = '<option value="">-- Select Event --</option>';
+      Object.keys(events).sort().reverse().forEach(date=>{
+        const event = events[date];
+        const hasTimeRuns = Object.values(event.runs || {}).some(r=>r.status === 'time');
+        if (hasTimeRuns || Object.keys(event.runs || {}).length) {
+          const option = document.createElement('option');
+          option.value = date;
+          option.textContent = `${new Date(date).toLocaleDateString('en-AU')} - ${event.car}`;
+          selector.appendChild(option);
+        }
+      });
+
+      if (currentValue && events[currentValue]) selector.value = currentValue;
+      else if (currentEvent && events[currentEvent.date]) selector.value = currentEvent.date;
+
+      renderHistoryView();
+    }
+
+    function renderHistoryView(){
+      const selector = document.getElementById('historyEventSelect');
+      const runsCard = document.getElementById('historyRunsCard');
+      const graphCard = document.getElementById('historyGraphCard');
+      const container = document.getElementById('historyRunsContainer');
+      const deleteBtn = document.getElementById('deleteEventBtn');
+      if (!selector || !runsCard || !graphCard || !container) return;
+
+      const selectedDate = selector.value;
+      if(deleteBtn){
+        deleteBtn.disabled = !selectedDate;
+      }
+
+      if (!selectedDate || !events[selectedDate]) {
+        runsCard.style.display = 'none';
+        graphCard.style.display = 'none';
+        container.innerHTML = '';
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        document.getElementById('bestSector1').textContent = '--.--';
+        document.getElementById('bestSector2').textContent = '--.--';
+        document.getElementById('bestTotal').textContent = '--.--';
+        return;
+      }
+
+      const event = events[selectedDate];
+      const runNumbers = Object.keys(event.runs || {}).sort((a,b)=>parseInt(a,10)-parseInt(b,10));
+      const timeRuns = runNumbers.filter(runNum => event.runs[runNum].status === 'time');
+      runsCard.style.display = 'block';
+
+      let bestRunNum = null;
+      if (timeRuns.length) {
+        bestRunNum = timeRuns.reduce((best, runNum) => parseFloat(event.runs[runNum].totalTime) < parseFloat(event.runs[best].totalTime) ? runNum : best);
+      }
+
+      let html = `
+        <div class="day-header">
+          <div>
+            <h3>${new Date(selectedDate).toLocaleDateString('en-AU', { weekday:'short', year:'numeric', month:'short', day:'numeric' })}</h3>
+            <small style="opacity:.9;">${event.car} • ${event.laps} Lap${Number(event.laps) > 1 ? 's' : ''}</small>
+          </div>
+          <span>${runNumbers.length}/6 Runs</span>
+        </div>
+        <div class="runs-grid">
+      `;
+
+      runNumbers.forEach(runNum=>{
+        const run = event.runs[runNum];
+        const isBest = String(runNum) === String(bestRunNum);
+        const carClass = event.car === 'VW Polo' ? 'vw' : 'mercedes';
+        let cardClass = `${carClass}-run`;
+        let statusTag = '';
+        let content = '';
+
+        if (run.status === 'time') {
+          if (isBest) cardClass += ' best-run';
+          statusTag = '<span class="status-tag completed">COMPLETED</span>';
+          content = `
+            <div class="run-times">
+              <div class="time-box"><div class="time-label">Sector 1</div><div class="time-value">${formatSeconds(run.sector1)}s</div></div>
+              <div class="time-box"><div class="time-label">Sector 2</div><div class="time-value">${formatSeconds(run.sector2)}s</div></div>
+              <div class="time-box" style="background:#e0f2fe;"><div class="time-label">Total</div><div class="time-value" style="color:#075985;font-size:1.18rem;">${formatSeconds(run.totalTime)}s</div></div>
+            </div>
+          `;
+        } else if (run.status === 'DNS') {
+          cardClass += ' dns-run';
+          statusTag = '<span class="status-tag dns">DNS</span>';
+          content = '<div style="text-align:center;padding:18px;color:#b45309;font-weight:800;">Did Not Start</div>';
+        } else if (run.status === 'DSQ') {
+          cardClass += ' dsq-run';
+          statusTag = '<span class="status-tag dsq">DSQ</span>';
+          content = '<div style="text-align:center;padding:18px;color:#b91c1c;font-weight:800;">Disqualified</div>';
+        } else {
+          cardClass += ' no-run-card';
+          statusTag = '<span class="status-tag no-run">NO RUN</span>';
+          content = '<div style="text-align:center;padding:18px;color:#6b7280;font-weight:800;">No Run</div>';
+        }
+
+        html += `
+          <div class="run-card ${cardClass}">
+            <div class="run-header">
+              <span class="run-number">Run ${runNum}</span>
+              <div class="tag-row">
+                <span class="car-tag ${carClass}">${event.car}</span>
+                ${statusTag}
+                ${isBest && run.status === 'time' ? '<span class="best-badge">BEST</span>' : ''}
+              </div>
+            </div>
+            ${content}
+          </div>
+        `;
+      });
+
+      html += '</div>';
+      container.innerHTML = html;
+
+      if (timeRuns.length) {
+        graphCard.style.display = 'block';
+        updateGraph();
+      } else {
+        graphCard.style.display = 'none';
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+      }
+    }
+
+    function updateGraph(){
+      const selectedDate = document.getElementById('historyEventSelect').value;
+      if (!selectedDate || !events[selectedDate]) return;
+      const event = events[selectedDate];
+      const timeRuns = [];
+      for (let i = 1; i <= 6; i++) {
+        if (event.runs[i] && event.runs[i].status === 'time') {
+          timeRuns.push({
+            run:i,
+            sector1:parseFloat(event.runs[i].sector1),
+            sector2:parseFloat(event.runs[i].sector2),
+            total:parseFloat(event.runs[i].totalTime)
+          });
+        }
+      }
+      if (!timeRuns.length) {
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        document.getElementById('bestSector1').textContent = '--.--';
+        document.getElementById('bestSector2').textContent = '--.--';
+        document.getElementById('bestTotal').textContent = '--.--';
+        return;
+      }
+      document.getElementById('bestSector1').textContent = formatSeconds(Math.min(...timeRuns.map(r=>r.sector1)));
+      document.getElementById('bestSector2').textContent = formatSeconds(Math.min(...timeRuns.map(r=>r.sector2)));
+      document.getElementById('bestTotal').textContent = formatSeconds(Math.min(...timeRuns.map(r=>r.total)));
+
+      const ctx = document.getElementById('performanceChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      const colors = ['rgb(29,78,216)','rgb(193,18,31)','rgb(22,163,74)','rgb(245,158,11)','rgb(139,92,246)','rgb(107,114,128)'];
+      chartInstance = new Chart(ctx, {
+        type:'line',
+        data:{
+          labels:['Sector 1', 'Sector 2', 'Total Time'],
+          datasets: timeRuns.map((run, idx)=>({
+            label:`Run ${run.run}`,
+            data:[run.sector1, run.sector2, run.total],
+            borderColor:colors[idx % colors.length],
+            backgroundColor:colors[idx % colors.length].replace('rgb','rgba').replace(')',',0.12)'),
+            tension:0.3, pointRadius:6, pointHoverRadius:8, borderWidth:3
+          }))
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+          plugins:{
+            title:{display:true, text:`${new Date(selectedDate).toLocaleDateString('en-AU')} - ${event.car} Performance`, font:{size:16,weight:'bold'}, padding:20},
+            legend:{position:'top', labels:{usePointStyle:true, padding:14}},
+            tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}s`}}
+          },
+          scales:{
+            y:{beginAtZero:false,title:{display:true,text:'Time (seconds)'},ticks:{callback:v=>Number(v).toFixed(2)+'s'}},
+            x:{title:{display:true,text:'Sector / Total'}}
+          }
+        }
+      });
+    }
+
+    function updateRepairYearOptions(){
+      const selector = document.getElementById('filterRepairYear');
+      const currentValue = selector.value || 'All';
+      const years = [...new Set(repairs.map(r => new Date(r.date).getFullYear()).filter(Boolean))].sort((a,b)=>b-a);
+      selector.innerHTML = '<option value="All">All Years</option>';
+      years.forEach(year=>{
+        const option = document.createElement('option');
+        option.value = String(year);
+        option.textContent = String(year);
+        selector.appendChild(option);
+      });
+      if ([...selector.options].some(o => o.value === currentValue)) selector.value = currentValue;
+    }
+
+    function getFilteredRepairs(){
+      const car = document.getElementById('filterRepairCar').value;
+      const type = document.getElementById('filterRepairType').value;
+      const year = document.getElementById('filterRepairYear').value;
+
+      return repairs.filter(item=>{
+        const itemYear = String(new Date(item.date).getFullYear());
+        if (car !== 'All' && item.car !== car) return false;
+        if (type !== 'All' && item.type !== type) return false;
+        if (year !== 'All' && itemYear !== year) return false;
+        return true;
+      });
+    }
+
+    function renderRepairs(){
+      const container = document.getElementById('repairsContainer');
+      const filtered = getFilteredRepairs().slice().sort((a,b)=> (b.date || '').localeCompare(a.date || '') || b.id - a.id);
+
+      if (!filtered.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔧</div><p>No repair entries match your filters.</p></div>';
+        return;
+      }
+
+      let html = '<div class="repairs-grid">';
+      filtered.forEach(item=>{
+        const carClass = item.car === 'VW Polo' ? 'vw' : item.car === 'Mercedes A45s' ? 'mercedes' : 'general';
+        const cardClass = item.car === 'VW Polo' ? 'vw-repair' : item.car === 'Mercedes A45s' ? 'mercedes-repair' : 'general-repair';
+        const typeClass = (item.type || '').toLowerCase();
+        html += `
+          <div class="repair-card ${cardClass}">
+            <div class="repair-header">
+              <span class="repair-cost">${formatCurrency(item.cost)}</span>
+              <div class="tag-row">
+                <span class="car-tag ${carClass}">${item.car}</span>
+                ${item.type ? `<span class="type-tag ${typeClass}">${item.type}</span>` : ''}
+                ${item.category ? `<span class="category-tag">${item.category}</span>` : ''}
+              </div>
+            </div>
+            <div class="repair-meta">
+              <div class="repair-mini-box">
+                <div class="repair-label">Date</div>
+                <div class="repair-value">${new Date(item.date).toLocaleDateString('en-AU', { year:'numeric', month:'short', day:'numeric' })}</div>
+              </div>
+              <div class="repair-mini-box">
+                <div class="repair-label">Odometer</div>
+                <div class="repair-value">${item.odometer ? item.odometer.toLocaleString() + ' km' : '—'}</div>
+              </div>
+            </div>
+            <div class="repair-desc">${escapeHtml(item.description)}</div>
+            <button class="delete-btn" onclick="deleteRepair(${item.id})">🗑️ Delete Repair</button>
+          </div>
+        `;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    function escapeHtml(text){
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
+    function deleteRepair(id){
+      if (!confirm('Delete this repair entry?')) return;
+      repairs = repairs.filter(item => item.id !== id);
+      saveData();
+      updateRepairStats();
+      updateRepairYearOptions();
+      renderRepairs();
+    }
+
+    function exportData(){
+      const blob = new Blob([JSON.stringify({ events, repairs }, null, 2)], { type:'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `hillclimb-data-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showFeedback('Data exported successfully!', 'success');
+    }
+
+    function importData(input){
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e){
+        try {
+          const imported = JSON.parse(e.target.result);
+          let importedEvents = {};
+          let importedRepairs = [];
+          if (imported.events || imported.repairs) {
+            importedEvents = imported.events || {};
+            importedRepairs = Array.isArray(imported.repairs) ? imported.repairs : [];
+          } else {
+            importedEvents = imported || {};
+          }
+
+          const merge = confirm('Do you want to merge with existing data? Click OK to merge, Cancel to replace all data.');
+          if (merge) {
+            events = { ...events, ...importedEvents };
+            repairs = [...importedRepairs, ...repairs];
+          } else {
+            events = importedEvents;
+            repairs = importedRepairs;
+          }
+
+          saveData();
+          updateStats();
+          updateRepairStats();
+          updateRepairYearOptions();
+          updateGraphSelector();
+          renderRepairs();
+
+          if (currentEvent && !events[currentEvent.date]) {
+            currentEvent = null;
+            isSetupLocked = false;
+            editingOriginalDate = null;
+            unlockSetupUI();
+            document.getElementById('runEntrySection').style.display = 'none';
+          } else if (currentEvent) {
+            currentEvent = events[currentEvent.date];
+            updateRunSelector();
+          }
+          showFeedback('Data imported successfully!', 'success');
+        } catch (err) {
+          showFeedback('Error importing data: ' + err.message, 'error');
+        }
+        input.value = '';
+      };
+      reader.onerror = function(){
+        showFeedback('Error reading file', 'error');
+        input.value = '';
+      };
+      reader.readAsText(file);
+    }
+
+    function clearAllData(){
+      if (!confirm('⚠️ WARNING: This will permanently delete ALL your hill climb and repair data. This action cannot be undone. Are you sure?')) return;
+      if (!confirm('Are you absolutely sure? All events, runs, repairs and costs will be lost forever.')) return;
+      events = {};
+      repairs = [];
+      saveData();
+      currentEvent = null;
+      selectedRun = null;
+      isSetupLocked = false;
+      editingOriginalDate = null;
+      unlockSetupUI();
+      document.getElementById('runEntrySection').style.display = 'none';
+      document.getElementById('timeEntryForm').style.display = 'none';
+      updateStats();
+      updateRepairStats();
+      updateRepairYearOptions();
+      updateGraphSelector();
+      renderRepairs();
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+      showFeedback('All data has been cleared.', 'success');
+    }
+
+    function showFeedback(message, type){
+      const feedback = document.getElementById('importFeedback');
+      feedback.textContent = message;
+      feedback.className = 'import-feedback ' + type;
+      setTimeout(()=>{ feedback.className = 'import-feedback'; feedback.textContent = ''; }, 5000);
+    }
+
+    function loadTodayEventIfExists(){
+      const today = document.getElementById('eventDate').value;
+      if (events[today]) {
+        currentEvent = events[today];
+        isSetupLocked = true;
+        lockSetupUI();
+        showRunEntry();
+        updateRunSelector();
+      }
+    }
+
+
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('installAppBtn');
+      if (btn) btn.style.display = 'inline-block';
+    });
+
+    const installBtn = document.getElementById('installAppBtn');
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        installBtn.style.display = 'none';
+      });
+    }
+
+    window.addEventListener('appinstalled', () => {
+      const btn = document.getElementById('installAppBtn');
+      if (btn) btn.style.display = 'none';
+    });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js');
+      });
+    }
+
+    loadTodayEventIfExists();
+
+    updateStats();
+    updateRepairStats();
+    updateRepairYearOptions();
+    renderRepairs();
+    updateGraphSelector();
+  </script>
+</body>
+</html>
